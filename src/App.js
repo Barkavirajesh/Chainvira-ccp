@@ -1,33 +1,66 @@
 import { useState } from "react";
+import axios from "axios";
 import "./App.css";
 
 function WalletConnect() {
   const [account, setAccount] = useState(null);
   const [role, setRole] = useState("Admin"); // default role
+  const [lockedRole, setLockedRole] = useState(null); // store permanently connected role
 
   const roles = ["Admin", "Community", "Auditor", "Public"];
 
   const connectWallet = async () => {
     try {
-      if (role === "Public") {
-        alert("Public role does not require wallet connection.");
-        return;
-      }
-      if (window.ethereum) {
+      let walletAddress = null;
+
+      if (role !== "Public") {
+        if (!window.ethereum) {
+          alert("MetaMask is not installed!");
+          return;
+        }
+
         const accounts = await window.ethereum.request({
           method: "eth_requestAccounts",
         });
-        setAccount(accounts[0]);
+        walletAddress = accounts[0];
+        setAccount(walletAddress);
       } else {
-        alert("MetaMask is not installed!");
+        // Public role does not require wallet, but we can log it as "No Wallet"
+        walletAddress = "No Wallet";
       }
+
+      setLockedRole(role); // lock the current role
+
+      // Send wallet + role to backend
+      const response = await axios.post("http://localhost:5000/api/users", {
+        walletAddress,
+        role,
+      });
+
+      console.log("Backend response:", response.data); // log to confirm
+      alert(`Access granted and stored for role: ${role}`);
     } catch (error) {
       console.error("Wallet connection error:", error);
+      alert("Failed to connect wallet or save data");
     }
   };
 
   const disconnectWallet = () => {
-    setAccount(null);
+    alert("You cannot disconnect once the wallet is connected for this role.");
+  };
+
+  const handleRoleChange = (r) => {
+    if (r === "Public") {
+      setRole("Public");
+      return;
+    }
+
+    if (lockedRole && lockedRole !== "Public") {
+      alert(`You are already connected as ${lockedRole}. You cannot switch to another role.`);
+      return;
+    }
+
+    setRole(r);
   };
 
   return (
@@ -39,7 +72,7 @@ function WalletConnect() {
           <button
             key={r}
             className={`role-tab ${role === r ? "active" : ""}`}
-            onClick={() => setRole(r)}
+            onClick={() => handleRoleChange(r)}
           >
             {r}
           </button>
@@ -61,15 +94,15 @@ function WalletConnect() {
           </button>
         )}
 
-        {role === "Public" && <p className="public-note">Access granted ✅</p>}
+        {role === "Public" && <button className="connect-btn" onClick={connectWallet}>Enter Public Role ✅</button>}
 
         {account && (
           <>
             <div className="connected-info">
-              Connected: {account.substring(0, 6)}...{account.slice(-4)}
+              Connected: {account.substring(0, 6)}...{account.slice(-4)} as {lockedRole}
             </div>
             <button className="disconnect-btn" onClick={disconnectWallet}>
-              Disconnect
+              Disconnect ❌
             </button>
           </>
         )}
