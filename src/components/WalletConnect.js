@@ -1,8 +1,11 @@
 import { useState, useEffect } from "react";
+import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 function WalletConnect({ children }) {
   const [account, setAccount] = useState(null);
   const [role, setRole] = useState(""); // Track selected role
+  const navigate = useNavigate();
 
   // Connect wallet
   const connectWallet = async () => {
@@ -11,18 +14,33 @@ function WalletConnect({ children }) {
         const accounts = await window.ethereum.request({
           method: "eth_requestAccounts",
         });
-        setAccount(accounts[0]);
+        const walletAddress = accounts[0];
+        setAccount(walletAddress);
+
+        // Save wallet + role to backend
+        await axios.post("http://localhost:5000/api/users/connect", {
+          walletAddress,
+          role,
+        });
+
+        console.log("✅ User saved:", walletAddress, role);
+
+        // Redirect after connect
+        routeToDashboard(role);
       } else {
-        alert("MetaMask is not installed!");
+        alert("⚠️ MetaMask is not installed!");
       }
     } catch (error) {
       console.error("Wallet connection error:", error);
+      alert("❌ Failed to connect wallet or save user");
     }
   };
 
   // Disconnect wallet
   const disconnectWallet = () => {
     setAccount(null);
+    setRole("");
+    navigate("/"); // go back to landing
   };
 
   // Listen for account changes
@@ -32,11 +50,26 @@ function WalletConnect({ children }) {
         if (accounts.length > 0) {
           setAccount(accounts[0]);
         } else {
-          setAccount(null); // disconnected
+          setAccount(null);
         }
       });
     }
   }, []);
+
+  // Handle routing
+  const routeToDashboard = (roleName) => {
+    if (roleName === "Admin") navigate("/admin");
+    else if (roleName === "Community") navigate("/community");
+    else if (roleName === "Auditor") navigate("/auditor");
+    else navigate("/public");
+  };
+
+  // Auto-route if already connected & role is set
+  useEffect(() => {
+    if (role && (role === "Public" || account)) {
+      routeToDashboard(role);
+    }
+  }, [role, account]);
 
   // Styles
   const cardStyle = {
@@ -55,7 +88,7 @@ function WalletConnect({ children }) {
     fontWeight: "600",
   };
 
-  // If role not chosen yet
+  // Role not chosen
   if (!role) {
     return (
       <div style={cardStyle} className="bg-light">
@@ -74,7 +107,7 @@ function WalletConnect({ children }) {
     );
   }
 
-  // Public role (no wallet connection required)
+  // Public role (no wallet required)
   if (role === "Public") {
     return (
       <div style={cardStyle} className="bg-white">
@@ -85,7 +118,7 @@ function WalletConnect({ children }) {
     );
   }
 
-  // For Admin, Community, Auditor -> Show wallet connect flow
+  // Wallet connection required roles
   if (!account) {
     return (
       <div style={cardStyle} className="bg-light">
@@ -104,7 +137,7 @@ function WalletConnect({ children }) {
     );
   }
 
-  // If connected
+  // Connected state
   return (
     <div style={cardStyle} className="bg-white">
       <h5 className="mb-3 text-success">✅ Wallet Connected ({role})</h5>
