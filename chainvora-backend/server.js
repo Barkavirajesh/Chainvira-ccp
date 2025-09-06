@@ -1,35 +1,55 @@
-// server.js (backend only, no React here!)
-
 const express = require("express");
+const mongoose = require("mongoose");
 const cors = require("cors");
-const bodyParser = require("body-parser");
 
 const app = express();
 const PORT = 5000;
 
-// Middleware
 app.use(cors());
-app.use(bodyParser.json());
+app.use(express.json());
 
-// Test route
-app.get("/", (req, res) => {
-  res.send("Backend server is running 🚀");
+// MongoDB connect
+mongoose.connect("mongodb://127.0.0.1:27017/chainvora", {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
 });
 
-// Example POST route
-app.post("/api/save-data", (req, res) => {
-  const { walletAddress, role } = req.body;
+// Schema + Model
+const requestSchema = new mongoose.Schema({
+  centerName: String,
+  amount: Number,
+  reason: String,
+  status: String,
+});
+const Request = mongoose.model("Request", requestSchema);
 
-  if (!walletAddress || !role) {
-    return res.status(400).json({ message: "Wallet address and role are required" });
-  }
+// API routes
+app.get("/api/requests", async (req, res) => {
+  const requests = await Request.find();
+  res.json(requests);
+});
 
-  console.log("Received Data:", walletAddress, role);
+app.post("/api/requests", async (req, res) => {
+  const { centerName, amount, reason, status } = req.body;
+  const newRequest = new Request({ centerName, amount, reason, status });
+  await newRequest.save();
+  res.json(newRequest);
+});
 
-  res.json({ message: "Data received successfully", data: { walletAddress, role } });
+app.put("/api/requests/:id", async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  const updated = await Request.findByIdAndUpdate(
+    id,
+    { status },
+    { new: true }
+  );
+  res.json(updated);
 });
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
+
+
