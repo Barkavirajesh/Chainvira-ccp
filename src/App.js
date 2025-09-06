@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Routes, Route, useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./App.css";
+import CommunityDashboard from "./dashboards/CommunityDashboard";
 
 // ---------------- WalletConnect ----------------
 function WalletConnect() {
@@ -18,7 +19,7 @@ function WalletConnect() {
 
       if (role !== "Public") {
         if (!window.ethereum) {
-          alert("⚠️ MetaMask is not installed!");
+          alert("⚠ MetaMask is not installed!");
           return;
         }
         const accounts = await window.ethereum.request({
@@ -47,7 +48,7 @@ function WalletConnect() {
   const handleRoleChange = (r) => {
     if (lockedRole && lockedRole !== "Public") {
       alert(
-        `⚠️ You are already connected as ${lockedRole}. Switching is not allowed.`
+        `⚠ You are already connected as ${lockedRole}. Switching is not allowed.`
       );
       return;
     }
@@ -56,7 +57,7 @@ function WalletConnect() {
 
   const goNext = () => {
     if (!lockedRole) {
-      alert("⚠️ Please connect wallet or enter as Public first!");
+      alert("⚠ Please connect wallet or enter as Public first!");
       return;
     }
     switch (lockedRole) {
@@ -73,7 +74,7 @@ function WalletConnect() {
         navigate("/publicDashboard");
         break;
       default:
-        alert("⚠️ Invalid role!");
+        alert("⚠ Invalid role!");
     }
   };
 
@@ -110,14 +111,16 @@ function WalletConnect() {
         {lockedRole && (
           <div className="connected-info" style={{ marginTop: "15px" }}>
             ✅ Connected:{" "}
-            {account ? `${account.substring(0, 6)}...${account.slice(-4)}` : "No Wallet"}{" "}
+            {account
+              ? `${account.substring(0, 6)}...${account.slice(-4)}`
+              : "No Wallet"}{" "}
             as {lockedRole}
             <button
               className="next-btn"
               onClick={goNext}
               style={{ marginLeft: "10px" }}
             >
-              Next ➡️
+              Next ➡
             </button>
           </div>
         )}
@@ -141,10 +144,7 @@ const Sidebar = ({ role }) => {
         </button>
         {role === "Admin" && (
           <>
-            <button
-              style={styles.link}
-              onClick={() => navigate("/addFunds")}
-            >
+            <button style={styles.link} onClick={() => navigate("/addFunds")}>
               Add Funds
             </button>
             <button
@@ -181,10 +181,7 @@ const Sidebar = ({ role }) => {
             >
               View Allocated Funds
             </button>
-            <button
-              style={styles.link}
-              onClick={() => navigate("/uploadProof")}
-            >
+            <button style={styles.link} onClick={() => navigate("/uploadProof")}>
               Upload Proof
             </button>
             <button
@@ -215,7 +212,7 @@ const Card = ({ title, value }) => (
   </div>
 );
 
-// ---------------- Dashboards ----------------
+//---------------- Admin Dashboard ----------------
 function AdminDashboard() {
   const navigate = useNavigate();
   const [requests, setRequests] = useState([]);
@@ -231,7 +228,7 @@ function AdminDashboard() {
 
   useEffect(() => {
     fetchRequests();
-    const interval = setInterval(fetchRequests, 10000); // auto-refresh every 10s
+    const interval = setInterval(fetchRequests, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -334,6 +331,181 @@ function AdminDashboard() {
     </div>
   );
 }
+// ---------------- Add Funds Page ----------------
+function AddFunds() {
+  const [source, setSource] = useState("");
+  const [amount, setAmount] = useState("");
+  const [purpose, setPurpose] = useState("");
+  const [notes, setNotes] = useState("");
+  const [transactionHash, setTransactionHash] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [funds, setFunds] = useState([]);
+
+  // Fetch added funds
+  const fetchFunds = async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/api/fundPool");
+      const data = Array.isArray(res.data) ? res.data : res.data.funds || [];
+      setFunds(data);
+    } catch (err) {
+      console.error("Error fetching fund pool:", err);
+      setFunds([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchFunds();
+  }, []);
+
+  // Submit new funds
+  const handleSubmit = async () => {
+    if (!source || !amount || !purpose) {
+      return alert("⚠ Please fill all required fields!");
+    }
+    try {
+      setLoading(true);
+      const res = await axios.post("http://localhost:5000/api/fundPool", {
+        source,
+        amount,
+        purpose,
+        notes,
+      });
+
+      setTransactionHash(res.data.txHash);
+      alert("✅ Funds Added Successfully!");
+
+      setSource("");
+      setAmount("");
+      setPurpose("");
+      setNotes("");
+      fetchFunds();
+    } catch (err) {
+      console.error("Error adding funds:", err);
+      alert("❌ Failed to add funds");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={styles.container}>
+      <Sidebar role="Admin" />
+      <div style={styles.main}>
+        <h1>💰 Add Funds</h1>
+
+        {/* Form */}
+        <div
+          style={{
+            background: "#fff",
+            padding: "20px",
+            borderRadius: "10px",
+            marginTop: "20px",
+            boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+          }}
+        >
+          <h3 style={styles.cardTitle}>Add New Funds</h3>
+
+          <label>Fund Source *</label>
+          <select
+            value={source}
+            onChange={(e) => setSource(e.target.value)}
+            style={inputStyle}
+          >
+            <option value="">-- Select Source --</option>
+            <option>Government Grant</option>
+            <option>NGO</option>
+            <option>CSR Donation</option>
+            <option>Individual Contribution</option>
+            <option>Others</option>
+          </select>
+
+          <label>Amount (₹) *</label>
+          <input
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            style={inputStyle}
+            placeholder="Enter Amount"
+          />
+
+          <label>Purpose *</label>
+          <input
+            type="text"
+            value={purpose}
+            onChange={(e) => setPurpose(e.target.value)}
+            style={inputStyle}
+            placeholder="Education / Healthcare / Infrastructure / etc."
+          />
+
+          <label>Notes (Optional)</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            style={inputStyle}
+            rows={3}
+            placeholder="Extra details if any"
+          />
+
+          <button
+            style={{ ...styles.button, marginTop: "10px" }}
+            onClick={handleSubmit}
+            disabled={loading}
+          >
+            {loading ? "⏳ Adding..." : "Add Funds"}
+          </button>
+
+          {transactionHash && (
+            <p style={{ marginTop: "15px", color: "green" }}>
+              ✅ Blockchain Tx: {transactionHash}
+            </p>
+          )}
+        </div>
+
+        {/* Recent Funds Table */}
+        <div
+          style={{
+            marginTop: "30px",
+            background: "#fff",
+            padding: "20px",
+            borderRadius: "10px",
+            boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+          }}
+        >
+          <h3 style={styles.cardTitle}>Recent Added Funds</h3>
+          {funds.length === 0 ? (
+            <p>No funds added yet.</p>
+          ) : (
+            <table style={{ width: "100%", marginTop: "10px" }}>
+              <thead>
+                <tr>
+                  <th>Source</th>
+                  <th>Amount</th>
+                  <th>Purpose</th>
+                  <th>Date</th>
+                  <th>Tx Hash</th>
+                </tr>
+              </thead>
+              <tbody>
+                {funds.map((f) => (
+                  <tr key={f._id}>
+                    <td>{f.source}</td>
+                    <td>₹{f.amount}</td>
+                    <td>{f.purpose}</td>
+                    <td>{new Date(f.createdAt).toLocaleDateString()}</td>
+                    <td>{f.txHash ? f.txHash.slice(0, 10) + "..." : "N/A"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
 
 // ---------------- Approved Funds Page ----------------
 function ApprovedFunds() {
@@ -342,9 +514,11 @@ function ApprovedFunds() {
   const fetchFunds = async () => {
     try {
       const res = await axios.get("http://localhost:5000/api/funds");
-      setFunds(res.data);
+      const data = Array.isArray(res.data) ? res.data : res.data.funds || [];
+      setFunds(data);
     } catch (error) {
       console.error("Error fetching approved funds:", error);
+      setFunds([]);
     }
   };
 
@@ -365,7 +539,7 @@ function ApprovedFunds() {
               <tr>
                 <th>Community Center</th>
                 <th>Wallet Address</th>
-                <th>Total Allocated</th>
+                <th>Amount</th>
               </tr>
             </thead>
             <tbody>
@@ -373,7 +547,7 @@ function ApprovedFunds() {
                 <tr key={f._id} style={{ borderBottom: "1px solid #e5e7eb" }}>
                   <td>{f.centerName}</td>
                   <td>{f.walletAddress || "N/A"}</td>
-                  <td>₹{f.totalAllocated}</td>
+                  <td>₹{f.amount}</td>
                 </tr>
               ))}
             </tbody>
@@ -384,95 +558,123 @@ function ApprovedFunds() {
   );
 }
 
-// ---------------- Community Dashboard ----------------
-function CommunityDashboard() {
-  const navigate = useNavigate();
-  const [funds, setFunds] = useState({ allocated: 0, spent: 0 });
-
-  const [proofFile, setProofFile] = useState(null);
-  const [progress, setProgress] = useState("");
-
-  // Request form states
+// ---------------- Allocate Funds Page ----------------
+function AllocateFunds() {
+  const [centers, setCenters] = useState([]);
+  const [funds, setFunds] = useState([]);
   const [centerName, setCenterName] = useState("");
+  const [walletAddress, setWalletAddress] = useState("");
   const [amount, setAmount] = useState("");
-  const [reason, setReason] = useState("");
 
-  const handleLogout = () => {
-    localStorage.clear();
-    navigate("/");
-    window.location.reload();
+  const fetchCenters = async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/api/users");
+      setCenters(res.data || []);
+    } catch (err) {
+      console.error("Error fetching centers:", err);
+    }
   };
 
   const fetchFunds = async () => {
     try {
       const res = await axios.get("http://localhost:5000/api/funds");
-      const centerFund = res.data.find((f) => f.centerName === centerName);
-      if (centerFund) {
-        setFunds({
-          allocated: centerFund.totalAllocated,
-          spent: 0, // Update if you track spent funds
-        });
-      }
-    } catch (error) {
-      console.error("Error fetching funds:", error);
+      setFunds(res.data || []);
+    } catch (err) {
+      console.error("Error fetching allocated funds:", err);
     }
   };
 
   useEffect(() => {
-    if (centerName) fetchFunds();
-  }, [centerName]);
+    fetchCenters();
+    fetchFunds();
+  }, []);
 
-  const handleFileChange = (e) => setProofFile(e.target.files[0]);
-  const handleUpload = () => {
-    if (!proofFile) return alert("Select a file first!");
-    alert(`Uploaded: ${proofFile.name}`);
-    setProofFile(null);
-  };
-
-  const handleProgressUpdate = () => {
-    if (!progress) return alert("Enter project progress!");
-    alert(`Project progress updated: ${progress}`);
-    setProgress("");
-  };
-
-  const handleRequest = async () => {
-    if (!centerName || !amount || !reason) {
-      return alert("⚠️ Please fill all fields before submitting!");
+  const handleAllocate = async () => {
+    if (!centerName || !walletAddress || !amount) {
+      return alert("⚠ Please fill all fields!");
     }
     try {
-      await axios.post("http://localhost:5000/api/requests", {
+      await axios.post("http://localhost:5000/api/funds", {
         centerName,
+        walletAddress,
         amount,
-        reason,
-        status: "Pending",
+        purpose: "Direct Allocation",
+        approvedBy: "Admin",
       });
-      alert("📤 Request sent successfully to Admin!");
+      alert("✅ Funds Allocated Successfully!");
       setCenterName("");
+      setWalletAddress("");
       setAmount("");
-      setReason("");
-    } catch (error) {
-      console.error("Error sending request:", error);
-      alert("❌ Failed to send request");
+      fetchFunds();
+    } catch (err) {
+      console.error("Error allocating funds:", err);
+      alert("❌ Failed to allocate funds");
     }
   };
 
   return (
     <div style={styles.container}>
-      <Sidebar role="Community" />
+      <Sidebar role="Admin" />
       <div style={styles.main}>
-        <div style={styles.header}>
-          <h1>Welcome, Community Center</h1>
-          <button style={styles.logoutBtn} onClick={handleLogout}>
-            Logout
+        <h1>🏦 Allocate Funds</h1>
+
+        {/* Form */}
+        <div
+          style={{
+            background: "#fff",
+            padding: "20px",
+            borderRadius: "10px",
+            marginTop: "20px",
+            boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+          }}
+        >
+          <h3 style={styles.cardTitle}>Allocate to Community Center</h3>
+
+          <label>Community Center *</label>
+          <select
+            value={centerName}
+            onChange={(e) => {
+              setCenterName(e.target.value);
+              const c = centers.find((x) => x.name === e.target.value);
+              if (c) setWalletAddress(c.walletAddress || "");
+            }}
+            style={inputStyle}
+          >
+            <option value="">-- Select Center --</option>
+            {centers.map((c) => (
+              <option key={c._id} value={c.name}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+
+          <label>Wallet Address *</label>
+          <input
+            type="text"
+            value={walletAddress}
+            onChange={(e) => setWalletAddress(e.target.value)}
+            style={inputStyle}
+            placeholder="Enter Wallet Address"
+          />
+
+          <label>Amount (₹) *</label>
+          <input
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            style={inputStyle}
+            placeholder="Enter Amount"
+          />
+
+          <button
+            style={{ ...styles.button, marginTop: "10px" }}
+            onClick={handleAllocate}
+          >
+            Allocate Funds
           </button>
         </div>
 
-        <div style={styles.cards}>
-          <Card title="Allocated Funds" value={`₹${funds.allocated}`} />
-          <Card title="Spent Funds" value={`₹${funds.spent}`} />
-          <Card title="Remaining Funds" value={`₹${funds.allocated - funds.spent}`} />
-        </div>
-
+        {/* Allocations Table */}
         <div
           style={{
             marginTop: "30px",
@@ -482,127 +684,184 @@ function CommunityDashboard() {
             boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
           }}
         >
-          <h3 style={styles.cardTitle}>Raise a Request to Admin</h3>
-          <input
-            type="text"
-            value={centerName}
-            onChange={(e) => setCenterName(e.target.value)}
-            placeholder="Enter Community Center Name"
-            style={inputStyle}
-          />
-          <input
-            type="number"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="Enter Amount (₹)"
-            style={inputStyle}
-          />
-          <textarea
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="Enter Reason for Request"
-            rows={3}
-            style={inputStyle}
-          />
-          <button style={styles.button} onClick={handleRequest}>
-            Submit Request 📤
-          </button>
+          <h3 style={styles.cardTitle}>📑 Allocated Funds</h3>
+          {funds.length === 0 ? (
+            <p>No allocations yet.</p>
+          ) : (
+            <table style={{ width: "100%", marginTop: "10px" }}>
+              <thead>
+                <tr>
+                  <th>Community Center</th>
+                  <th>Wallet Address</th>
+                  <th>Amount</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {funds.map((f) => (
+                  <tr key={f._id}>
+                    <td>{f.centerName}</td>
+                    <td>{f.walletAddress}</td>
+                    <td>₹{f.amount}</td>
+                    <td>{new Date(f.createdAt).toLocaleDateString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-// ---------------- Dummy Pages ----------------
-function AuditorDashboard() {
-  return <h2 style={{ padding: "30px" }}>Auditor Dashboard</h2>;
-}
-function PublicDashboard() {
-  return <h2 style={{ padding: "30px" }}>Public Dashboard</h2>;
-}
-function AddFunds() {
-  return <h2 style={{ padding: "30px" }}>💰 Add Funds Page</h2>;
-}
-function AllocateFunds() {
-  return <h2 style={{ padding: "30px" }}>🏢 Allocate Funds Page</h2>;
-}
+// ---------------- Fund Timeline Page ----------------
 function FundTimeline() {
-  return <h2 style={{ padding: "30px" }}>📊 Fund Timeline Page</h2>;
-}
-function Transactions() {
-  return <h2 style={{ padding: "30px" }}>📜 Transactions Page</h2>;
-}
-function Users() {
-  return <h2 style={{ padding: "30px" }}>👥 Users Management Page</h2>;
-}
-function UploadProofs() {
-  return <h2 style={{ padding: "30px" }}>✅ Verify Proofs Page</h2>;
+  const [timeline, setTimeline] = useState([]);
+
+  const fetchTimeline = async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/api/fundTimeline");
+      setTimeline(res.data);
+    } catch (err) {
+      console.error("Error fetching timeline:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchTimeline();
+  }, []);
+
+  return (
+    <div style={styles.container}>
+      <Sidebar role="Admin" />
+      <div style={styles.main}>
+        <h1>📊 Fund Timeline</h1>
+        {timeline.length === 0 ? (
+          <p>No timeline data available.</p>
+        ) : (
+          <ul style={{ marginTop: "20px", listStyle: "none", padding: 0 }}>
+            {timeline.map((item, idx) => (
+              <li
+                key={idx}
+                style={{
+                  background: "#fff",
+                  marginBottom: "15px",
+                  padding: "15px",
+                  borderRadius: "8px",
+                  boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                }}
+              >
+                <strong>{item.type}</strong> | {item.centerName} | ₹{item.amount}
+                <br />
+                <span style={{ color: "#6b7280" }}>{item.description}</span>
+                <br />
+                <small>
+                  {item.status} |{" "}
+                  {new Date(item.date).toLocaleString("en-IN")}
+                </small>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
 }
 
-// ---------------- Styles ----------------
-const styles = {
-  container: { display: "flex", minHeight: "100vh", background: "#f4f6f8" },
-  sidebar: { width: "240px", background: "#1e3a8a", color: "#fff", padding: "20px" },
-  sidebarTitle: { fontSize: "20px", fontWeight: "bold", marginBottom: "30px" },
-  nav: { display: "flex", flexDirection: "column", gap: "10px" },
-  link: {
-    background: "transparent",
-    border: "none",
-    color: "#fff",
-    fontSize: "16px",
-    cursor: "pointer",
-    textAlign: "left",
-    padding: "8px 0",
-  },
-  main: { flex: 1, padding: "30px" },
-  header: { display: "flex", justifyContent: "space-between", alignItems: "center" },
-  logoutBtn: {
-    background: "red",
-    color: "#fff",
-    border: "none",
-    padding: "8px 16px",
-    borderRadius: "5px",
-    cursor: "pointer",
-  },
-  cards: { display: "flex", gap: "20px", marginTop: "20px" },
-  card: {
-    flex: 1,
-    background: "#fff",
-    padding: "20px",
-    borderRadius: "10px",
-    boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-  },
-  cardTitle: { fontSize: "18px", fontWeight: "600", marginBottom: "10px" },
-  button: {
-    background: "#1e3a8a",
-    color: "#fff",
-    border: "none",
-    padding: "8px 16px",
-    borderRadius: "6px",
-    cursor: "pointer",
-  },
-};
 
-const inputStyle = { width: "100%", padding: "8px", margin: "10px 0", borderRadius: "6px", border: "1px solid #ccc" };
-
-// ---------------- App ----------------
-function App() {
+// ---------------- App Root ----------------
+export default function App() {
   return (
     <Routes>
       <Route path="/" element={<WalletConnect />} />
       <Route path="/adminDashboard" element={<AdminDashboard />} />
+      <Route path="/addFunds" element={<AddFunds />} />
       <Route path="/funds" element={<ApprovedFunds />} />
       <Route path="/communityDashboard" element={<CommunityDashboard />} />
-      <Route path="/auditorDashboard" element={<AuditorDashboard />} />
-      <Route path="/publicDashboard" element={<PublicDashboard />} />
-      <Route path="/addFunds" element={<AddFunds />} />
       <Route path="/allocateFunds" element={<AllocateFunds />} />
       <Route path="/fundTimeline" element={<FundTimeline />} />
-      <Route path="/transactions" element={<Transactions />} />
-      <Route path="/users" element={<Users />} />
-      <Route path="/uploadProof" element={<UploadProofs />} />
     </Routes>
   );
 }
 
-export default App;
+// ---------------- Styles ----------------
+const styles = {
+  container: {
+    display: "flex",
+    minHeight: "100vh",
+    background: "#f9fafb",
+  },
+  sidebar: {
+    width: "250px",
+    background: "#111827",
+    color: "#fff",
+    padding: "20px",
+  },
+  sidebarTitle: {
+    fontSize: "20px",
+    fontWeight: "bold",
+    marginBottom: "20px",
+  },
+  nav: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "10px",
+  },
+  link: {
+    background: "#1f2937",
+    color: "#fff",
+    padding: "10px",
+    border: "none",
+    borderRadius: "5px",
+    cursor: "pointer",
+    textAlign: "left",
+  },
+  main: {
+    flex: 1,
+    padding: "30px",
+  },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  logoutBtn: {
+    background: "red",
+    color: "#fff",
+    padding: "8px 16px",
+    border: "none",
+    borderRadius: "5px",
+    cursor: "pointer",
+  },
+  card: {
+    background: "#fff",
+    padding: "20px",
+    borderRadius: "10px",
+    boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+    flex: 1,
+    textAlign: "center",
+  },
+  cardTitle: {
+    fontSize: "18px",
+    fontWeight: "bold",
+    marginBottom: "10px",
+  },
+  button: {
+    background: "blue",
+    color: "#fff",
+    padding: "10px 16px",
+    border: "none",
+    borderRadius: "5px",
+    cursor: "pointer",
+  },
+};
+
+const inputStyle = {
+  width: "100%",
+  padding: "10px",
+  marginTop: "8px",
+  marginBottom: "15px",
+  border: "1px solid #d1d5db",
+  borderRadius: "5px",
+};
