@@ -1,0 +1,146 @@
+/* Layout */
+.community-dashboard {
+  display: flex;
+  height: 100vh;
+  font-family: Arial, sans-serif;
+  background: #f9fafb;
+}
+
+/* Sidebar */
+.community-dashboard .sidebar {
+  width: 220px;
+  background: #1e293b;
+  color: white;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.community-dashboard .sidebar h2 {
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+.community-dashboard .sidebar nav a {
+  display: block;
+  margin: 15px 0;
+  text-decoration: none;
+  color: #cbd5e1;
+  font-size: 16px;
+  transition: 0.3s;
+}
+
+.community-dashboard .sidebar nav a:hover {
+  color: #38bdf8;
+}
+
+/* Main Content */
+.community-dashboard .main-content {
+  flex: 1;
+  padding: 20px 30px;
+  overflow-y: auto;
+}
+
+.community-dashboard .main-content h1 {
+  font-size: 28px;
+  font-weight: bold;
+  margin-bottom: 20px;
+}
+
+/* Summary Cards */
+.community-dashboard .summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.community-dashboard .card {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.community-dashboard .card h2 {
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+.community-dashboard .card p {
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.community-dashboard .card .green {
+  color: #16a34a;
+}
+
+.community-dashboard .card .red {
+  color: #dc2626;
+}
+
+.community-dashboard .card .blue {
+  color: #2563eb;
+}
+
+/* Form Section */
+.community-dashboard form {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 15px;
+}
+
+.community-dashboard form input {
+  padding: 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.community-dashboard form button {
+  grid-column: span 3;
+  padding: 10px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: 0.3s;
+}
+
+.community-dashboard form button:hover {
+  background: #1e40af;
+}
+
+/* Tables */
+.community-dashboard table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.community-dashboard th,
+.community-dashboard td {
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  text-align: left;
+  font-size: 14px;
+}
+
+.community-dashboard thead {
+  background: #f1f5f9;
+  font-weight: bold;
+}
+
+.community-dashboard tbody tr:hover {
+  background: #f9fafb;
+}

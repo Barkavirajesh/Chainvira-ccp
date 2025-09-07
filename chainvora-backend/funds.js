@@ -5,19 +5,35 @@ const router = express.Router();
 
 // ================== Approved Fund Schema ==================
 const approvedFundSchema = new mongoose.Schema({
-  centerName: { type: String, required: true },   // Which center got funds
-  walletAddress: { type: String, required: false }, // Wallet for tracking
-  amount: { type: Number, required: true },       // Fund amount
-  purpose: { type: String, required: true },      // Reason for approval
-  approvedBy: { type: String },                   // Admin who approved
-  txHash: { type: String },                       // Mock blockchain hash
+  centerName: { type: String, required: true },     // Which center got funds
+  walletAddress: { type: String },                  // Wallet for tracking
+  amount: { type: Number, required: true },         // Fund amount
+  purpose: { type: String, required: true },        // Reason for approval
+  approvedBy: { type: String },                     // Admin who approved
+  txHash: { type: String },                         // Mock blockchain hash
   createdAt: { type: Date, default: Date.now },
 });
 
-// Avoid model overwrite error in watch mode
+// ✅ Prevent OverwriteModelError
 const ApprovedFund =
   mongoose.models.ApprovedFund ||
   mongoose.model("ApprovedFund", approvedFundSchema);
+
+// ================== Transaction Schema ==================
+const transactionSchema = new mongoose.Schema({
+  type: { type: String, required: true }, // "Allocate Fund"
+  centerName: { type: String },
+  walletAddress: { type: String },
+  amount: { type: Number, required: true },
+  purpose: { type: String },
+  approvedBy: { type: String },
+  txHash: { type: String },
+  createdAt: { type: Date, default: Date.now },
+});
+
+const Transaction =
+  mongoose.models.Transaction ||
+  mongoose.model("Transaction", transactionSchema);
 
 // ================== Routes ==================
 
@@ -32,16 +48,30 @@ router.post("/", async (req, res) => {
         .json({ error: "centerName, amount, and purpose are required" });
     }
 
+    const txHash = "0x" + Math.random().toString(16).slice(2, 10);
+
+    // ✅ Save in ApprovedFund collection
     const newApprovedFund = new ApprovedFund({
       centerName,
-      walletAddress, // ✅ include wallet address if provided
+      walletAddress,
       amount,
       purpose,
       approvedBy,
-      txHash: "0x" + Math.random().toString(16).slice(2, 10),
+      txHash,
     });
-
     await newApprovedFund.save();
+
+    // ✅ Also save in Transactions collection
+    const newTransaction = new Transaction({
+      type: "Allocate Fund",
+      centerName,
+      walletAddress,
+      amount,
+      purpose,
+      approvedBy,
+      txHash,
+    });
+    await newTransaction.save();
 
     res.json(newApprovedFund);
   } catch (error) {

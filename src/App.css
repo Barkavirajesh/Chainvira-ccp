@@ -127,3 +127,160 @@ body {
   color: #4ade80;
   font-weight: 500;
 }
+/* ============ LAYOUT ============ */
+.dashboard-container {
+  display: flex;
+  min-height: 100vh;
+  background: #f8fafc; /* same gray-50 background */
+  font-family: 'Inter', sans-serif;
+}
+
+/* ============ SIDEBAR ============ */
+.sidebar {
+  width: 260px;
+  background: #ffffff;
+  padding: 1.5rem;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.06);
+}
+
+.sidebar h2 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #2563eb; /* blue-600 */
+  margin-bottom: 2rem;
+}
+
+.sidebar nav a {
+  display: block;
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+  font-weight: 500;
+  color: #374151; /* gray-700 */
+  text-decoration: none;
+  transition: 0.2s;
+}
+
+.sidebar nav a:hover {
+  background: #eff6ff; /* blue-50 */
+  color: #2563eb; /* blue-600 */
+}
+
+/* ============ MAIN ============ */
+.main-content {
+  flex: 1;
+  padding: 2rem;
+}
+
+.main-content h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+  color: #111827; /* gray-900 */
+}
+
+/* ============ SUMMARY CARDS ============ */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+  margin-bottom: 3rem;
+}
+
+.summary-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 1.5rem;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  transition: transform 0.2s;
+}
+
+.summary-card:hover {
+  transform: translateY(-4px);
+}
+
+.summary-card h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.summary-card p {
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.summary-card.green p { color: #16a34a; }   /* green-600 */
+.summary-card.red p { color: #dc2626; }     /* red-600 */
+.summary-card.blue p { color: #2563eb; }    /* blue-600 */
+
+/* ============ SECTIONS ============ */
+.section {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.section h2 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: #1e293b; /* slate-800 */
+}
+
+/* ============ FORMS ============ */
+.section form {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.section input,
+.section select {
+  border: 1px solid #d1d5db; /* gray-300 */
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.95rem;
+}
+
+.section button {
+  grid-column: span 3;
+  padding: 0.7rem 1rem;
+  background: #2563eb;
+  color: white;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.section button:hover {
+  background: #1d4ed8;
+}
+
+/* ============ TABLES ============ */
+.section table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  font-size: 0.95rem;
+}
+
+.section th,
+.section td {
+  border: 1px solid #e5e7eb; /* gray-200 */
+  padding: 0.75rem;
+  text-align: left;
+}
+
+.section th {
+  background: #f9fafb;
+  font-weight: 600;
+}
+
+.section tbody tr:hover {
+  background: #f3f4f6; /* gray-100 */
+}

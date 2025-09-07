@@ -1,6 +1,8 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const multer = require("multer");
+const path = require("path");
 
 const app = express();
 const PORT = 5000;
@@ -33,7 +35,6 @@ const requestSchema = new mongoose.Schema({
   status: { type: String, default: "Pending" }, // Pending / Approved / Rejected
   createdAt: { type: Date, default: Date.now },
 });
-
 const Request = mongoose.model("Request", requestSchema);
 
 // User Schema
@@ -41,7 +42,6 @@ const userSchema = new mongoose.Schema({
   walletAddress: { type: String, required: true, unique: true },
   role: { type: String, required: true },
 });
-
 const User = mongoose.model("User", userSchema);
 
 // Approved Fund Schema
@@ -54,7 +54,6 @@ const approvedFundSchema = new mongoose.Schema({
   txHash: { type: String },
   createdAt: { type: Date, default: Date.now },
 });
-
 const ApprovedFund =
   mongoose.models.ApprovedFund ||
   mongoose.model("ApprovedFund", approvedFundSchema);
@@ -68,8 +67,21 @@ const fundSchema = new mongoose.Schema({
   txHash: { type: String },
   createdAt: { type: Date, default: Date.now },
 });
-
 const Fund = mongoose.models.Fund || mongoose.model("Fund", fundSchema);
+
+// Transaction Schema
+const transactionSchema = new mongoose.Schema({
+  type: { type: String, required: true }, // e.g., "Add Fund", "Allocate Fund", "Request", "Approval"
+  centerName: { type: String },
+  source: { type: String },
+  amount: { type: Number, required: true },
+  purpose: { type: String },
+  notes: { type: String },
+  txHash: { type: String },
+  createdAt: { type: Date, default: Date.now },
+});
+const Transaction =
+  mongoose.models.Transaction || mongoose.model("Transaction", transactionSchema);
 
 // ================== API Routes ==================
 
@@ -88,6 +100,16 @@ app.post("/api/requests", async (req, res) => {
     const { centerName, amount, reason, status } = req.body;
     const newRequest = new Request({ centerName, amount, reason, status });
     await newRequest.save();
+
+    // Log as transaction
+    const tx = new Transaction({
+      type: "Request",
+      centerName,
+      amount,
+      purpose: reason,
+    });
+    await tx.save();
+
     res.json(newRequest);
   } catch (error) {
     res.status(500).json({ error: "Server error" });
@@ -107,6 +129,15 @@ app.put("/api/requests/:id", async (req, res) => {
     );
 
     if (!updated) return res.status(404).json({ error: "Request not found" });
+
+    // Log approval/rejection as transaction
+    const tx = new Transaction({
+      type: status,
+      centerName: updated.centerName,
+      amount: updated.amount,
+      purpose: updated.reason,
+    });
+    await tx.save();
 
     res.json(updated);
   } catch (error) {
@@ -156,6 +187,11 @@ app.use("/api/fundPool", fundPoolRoutes);
 const fundsRoutes = require("./funds");
 app.use("/api/funds", fundsRoutes);
 
+// --- Transactions ---
+const transactionRoutes = require("./transactions");
+app.use("/api/transactions", transactionRoutes);
+
+
 // --- Fund Timeline ---
 app.get("/api/fundTimeline", async (req, res) => {
   try {
@@ -204,6 +240,31 @@ app.get("/api/fundTimeline", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+
+// --- Proof of Spend Upload ---
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, "uploads/"); // save in uploads/ folder
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + path.extname(file.originalname)); // unique filename
+  },
+});
+
+const upload = multer({ storage: storage });
+
+app.post("/api/proofUpload", upload.single("file"), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "No file uploaded" });
+  }
+  res.json({
+    message: "File uploaded successfully",
+    filePath: `/uploads/${req.file.filename}`,
+  });
+});
+
+// Make uploads folder accessible
+app.use("/uploads", express.static("uploads"));
 
 // ================== Start Server ==================
 app.listen(PORT, () => {

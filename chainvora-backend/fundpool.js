@@ -13,7 +13,23 @@ const fundSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },   // Auto timestamp
 });
 
-const Fund = mongoose.model("Fund", fundSchema);
+// ✅ Prevent OverwriteModelError
+const Fund = mongoose.models.Fund || mongoose.model("Fund", fundSchema);
+
+// ================== Transaction Schema ==================
+const transactionSchema = new mongoose.Schema({
+  type: { type: String, required: true }, // "Add Fund"
+  source: { type: String },
+  amount: { type: Number, required: true },
+  purpose: { type: String },
+  notes: { type: String },
+  txHash: { type: String },
+  createdAt: { type: Date, default: Date.now },
+});
+
+const Transaction =
+  mongoose.models.Transaction ||
+  mongoose.model("Transaction", transactionSchema);
 
 // ================== Routes ==================
 
@@ -28,16 +44,29 @@ router.post("/", async (req, res) => {
         .json({ error: "Source, amount, and purpose are required" });
     }
 
-    // Save to MongoDB
+    // Generate mock tx hash
+    const txHash = "0x" + Math.random().toString(16).slice(2, 10);
+
+    // Save to Fund collection
     const newFund = new Fund({
       source,
       amount,
       purpose,
       notes,
-      txHash: "0x" + Math.random().toString(16).slice(2, 10), // mock tx hash
+      txHash,
     });
-
     await newFund.save();
+
+    // ✅ Also log into Transaction collection
+    const newTransaction = new Transaction({
+      type: "Add Fund",
+      source,
+      amount,
+      purpose,
+      notes,
+      txHash,
+    });
+    await newTransaction.save();
 
     res.json(newFund);
   } catch (error) {
@@ -65,8 +94,11 @@ router.get("/summary", async (req, res) => {
       { $group: { _id: null, total: { $sum: "$amount" } } }
     ]);
 
-    // Aggregate total allocated from ApprovedFunds
-    const ApprovedFund = mongoose.model("ApprovedFund");
+    // ✅ Safe ApprovedFund model reference
+    const ApprovedFund =
+      mongoose.models.ApprovedFund ||
+      mongoose.model("ApprovedFund");
+
     const allocatedFunds = await ApprovedFund.aggregate([
       { $group: { _id: null, total: { $sum: "$amount" } } }
     ]);

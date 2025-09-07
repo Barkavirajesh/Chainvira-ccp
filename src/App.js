@@ -1,8 +1,11 @@
+// src/App.js
 import { useState, useEffect } from "react";
 import { Routes, Route, useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./App.css";
 import CommunityDashboard from "./dashboards/CommunityDashboard";
+import PublicDashboard from "./dashboards/PublicDashboard";
+import AuditorDashboard from "./dashboards/AuditorDashboard";
 
 // ---------------- WalletConnect ----------------
 function WalletConnect() {
@@ -203,16 +206,7 @@ const Sidebar = ({ role }) => {
   );
 };
 
-const Card = ({ title, value }) => (
-  <div style={styles.card}>
-    <h3 style={{ fontSize: "16px", fontWeight: "600" }}>{title}</h3>
-    <p style={{ fontSize: "20px", fontWeight: "bold", marginTop: "10px" }}>
-      {value}
-    </p>
-  </div>
-);
-
-//---------------- Admin Dashboard ----------------
+// ---------------- Admin Dashboard ----------------
 function AdminDashboard() {
   const navigate = useNavigate();
   const [requests, setRequests] = useState([]);
@@ -331,6 +325,7 @@ function AdminDashboard() {
     </div>
   );
 }
+
 // ---------------- Add Funds Page ----------------
 function AddFunds() {
   const [source, setSource] = useState("");
@@ -768,6 +763,69 @@ function FundTimeline() {
     </div>
   );
 }
+// ---------------- Transactions Page ----------------
+function Transactions() {
+  const [transactions, setTransactions] = useState([]);
+
+ const fetchTransactions = async () => {
+  try {
+    const res = await axios.get("http://localhost:5000/api/transactions");
+    const data = Array.isArray(res.data) ? res.data : res.data.transactions || [];
+    setTransactions(data);
+  } catch (err) {
+    console.error("❌ Error fetching transactions:", err);
+    setTransactions([]);
+  }
+};
+
+useEffect(() => {
+  fetchTransactions();
+}, []);
+
+  return (
+    <div style={styles.container}>
+      <Sidebar role="Admin" />
+      <div style={styles.main}>
+        <h1>💹 Transactions</h1>
+
+        {transactions.length === 0 ? (
+          <p>No transactions recorded yet.</p>
+        ) : (
+          <table style={{ width: "100%", marginTop: "20px", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ background: "#f3f4f6" }}>
+                <th style={tableHead}>Tx Hash</th>
+                <th style={tableHead}>From</th>
+                <th style={tableHead}>To</th>
+                <th style={tableHead}>Amount</th>
+                <th style={tableHead}>Date</th>
+                <th style={tableHead}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {transactions.map((tx) => (
+                <tr key={tx._id} style={{ borderBottom: "1px solid #e5e7eb" }}>
+                  <td style={tableCell}>
+                    {tx.txHash ? tx.txHash.slice(0, 10) + "..." : "N/A"}
+                  </td>
+                  <td style={tableCell}>{tx.from || "N/A"}</td>
+                  <td style={tableCell}>{tx.to || "N/A"}</td>
+                  <td style={tableCell}>₹{tx.amount}</td>
+                  <td style={tableCell}>
+                    {tx.createdAt ? new Date(tx.createdAt).toLocaleString() : "N/A"}
+                  </td>
+                  <td style={{ ...tableCell, fontWeight: "bold", color: tx.status === "Success" ? "green" : "red" }}>
+                    {tx.status || "Pending"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
 
 
 // ---------------- App Root ----------------
@@ -781,6 +839,9 @@ export default function App() {
       <Route path="/communityDashboard" element={<CommunityDashboard />} />
       <Route path="/allocateFunds" element={<AllocateFunds />} />
       <Route path="/fundTimeline" element={<FundTimeline />} />
+      <Route path="/auditorDashboard" element={<AuditorDashboard />} />
+      <Route path="/publicDashboard" element={<PublicDashboard />} />
+      <Route path="/transactions" element={<Transactions />} />
     </Routes>
   );
 }
@@ -834,14 +895,6 @@ const styles = {
     borderRadius: "5px",
     cursor: "pointer",
   },
-  card: {
-    background: "#fff",
-    padding: "20px",
-    borderRadius: "10px",
-    boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-    flex: 1,
-    textAlign: "center",
-  },
   cardTitle: {
     fontSize: "18px",
     fontWeight: "bold",
@@ -864,4 +917,13 @@ const inputStyle = {
   marginBottom: "15px",
   border: "1px solid #d1d5db",
   borderRadius: "5px",
+};
+const tableHead = {
+  padding: "10px",
+  textAlign: "left",
+  fontWeight: "600",
+  borderBottom: "2px solid #d1d5db",
+};
+const tableCell = {
+  padding: "10px",
 };
