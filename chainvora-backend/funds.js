@@ -35,7 +35,7 @@ const Transaction =
   mongoose.models.Transaction ||
   mongoose.model("Transaction", transactionSchema);
 
-// ================== Routes ==================
+// ================== Admin Routes ==================
 
 // Add new approved fund (POST /api/funds)
 router.post("/", async (req, res) => {
@@ -87,6 +87,59 @@ router.get("/", async (req, res) => {
     res.json(approvedFunds);
   } catch (error) {
     console.error("❌ Error fetching approved funds:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ================== Auditor Routes ==================
+
+// Get all transactions (GET /api/funds/transactions)
+router.get("/transactions", async (req, res) => {
+  try {
+    const transactions = await Transaction.find().sort({ createdAt: -1 });
+    res.json(transactions);
+  } catch (error) {
+    console.error("❌ Error fetching transactions:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Get funds summary (GET /api/funds/summary)
+router.get("/summary", async (req, res) => {
+  try {
+    const totalFunds = await ApprovedFund.aggregate([
+      { $group: { _id: null, totalAmount: { $sum: "$amount" } } },
+    ]);
+
+    const fundsByCenter = await ApprovedFund.aggregate([
+      {
+        $group: {
+          _id: "$centerName",
+          totalAmount: { $sum: "$amount" },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { totalAmount: -1 } },
+    ]);
+
+    res.json({
+      totalFunds: totalFunds[0]?.totalAmount || 0,
+      fundsByCenter,
+    });
+  } catch (error) {
+    console.error("❌ Error fetching summary:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Get single fund details (GET /api/funds/:id)
+router.get("/:id", async (req, res) => {
+  try {
+    const fund = await ApprovedFund.findById(req.params.id);
+    if (!fund) return res.status(404).json({ error: "Fund not found" });
+    res.json(fund);
+  } catch (error) {
+    console.error("❌ Error fetching fund details:", error);
     res.status(500).json({ error: "Server error" });
   }
 });

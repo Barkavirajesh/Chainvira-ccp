@@ -1,3 +1,4 @@
+// server.js
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -33,16 +34,19 @@ const requestSchema = new mongoose.Schema({
   amount: { type: Number, required: true },
   reason: { type: String, required: true },
   status: { type: String, default: "Pending" }, // Pending / Approved / Rejected
+  proof: { type: String }, // uploaded proof (filePath)
+  remarks: [{ remark: String, createdAt: { type: Date, default: Date.now } }],
+  approvedBy: { type: String },
   createdAt: { type: Date, default: Date.now },
 });
-const Request = mongoose.model("Request", requestSchema);
+const Request = mongoose.models.Request || mongoose.model("Request", requestSchema);
 
 // User Schema
 const userSchema = new mongoose.Schema({
   walletAddress: { type: String, required: true, unique: true },
   role: { type: String, required: true },
 });
-const User = mongoose.model("User", userSchema);
+const User = mongoose.models.User || mongoose.model("User", userSchema);
 
 // Approved Fund Schema
 const approvedFundSchema = new mongoose.Schema({
@@ -71,12 +75,13 @@ const Fund = mongoose.models.Fund || mongoose.model("Fund", fundSchema);
 
 // Transaction Schema
 const transactionSchema = new mongoose.Schema({
-  type: { type: String, required: true }, // e.g., "Add Fund", "Allocate Fund", "Request", "Approval"
+  type: { type: String, required: true }, // "Add Fund", "Allocate Fund", "Request", "Approval"
   centerName: { type: String },
   source: { type: String },
   amount: { type: Number, required: true },
   purpose: { type: String },
   notes: { type: String },
+  approvedBy: { type: String },
   txHash: { type: String },
   createdAt: { type: Date, default: Date.now },
 });
@@ -84,6 +89,56 @@ const Transaction =
   mongoose.models.Transaction || mongoose.model("Transaction", transactionSchema);
 
 // ================== API Routes ==================
+// --- Public APIs ---
+
+// 1. Approved Funds (read-only for public)
+app.get("/api/public/approved", async (req, res) => {
+  try {
+    const funds = await ApprovedFund.find().sort({ createdAt: -1 });
+    res.json(funds);
+  } catch (error) {
+    console.error("❌ Error fetching approved funds:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// 2. Status Tracking (from Requests + Remarks)
+app.get("/api/status", async (req, res) => {
+  try {
+    const requests = await Request.find().sort({ createdAt: -1 });
+    const statusUpdates = requests.map((r) => ({
+      centerName: r.centerName,
+      update: r.status,
+      date: r.createdAt,
+      remarks: r.remarks || [],
+    }));
+    res.json(statusUpdates);
+  } catch (error) {
+    console.error("❌ Error fetching status:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// 3. Milestones (from Transactions)
+app.get("/api/milestones", async (req, res) => {
+  try {
+    const milestones = await Transaction.find({
+      type: { $in: ["Add Fund", "Allocate Fund", "Approved"] },
+    }).sort({ createdAt: -1 });
+
+    const formatted = milestones.map((m) => ({
+      centerName: m.centerName || m.source,
+      milestone: `${m.type} — ${m.purpose || "N/A"}`,
+      completed: true,
+      date: m.createdAt,
+    }));
+
+    res.json(formatted);
+  } catch (error) {
+    console.error("❌ Error fetching milestones:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
 // --- Requests ---
 app.get("/api/requests", async (req, res) => {
@@ -120,26 +175,44 @@ app.post("/api/requests", async (req, res) => {
 app.put("/api/requests/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, approvedBy } = req.body;
 
     const updated = await Request.findByIdAndUpdate(
       id,
-      { status },
+      { status, approvedBy },
       { new: true }
     );
 
     if (!updated) return res.status(404).json({ error: "Request not found" });
 
-    // Log approval/rejection as transaction
     const tx = new Transaction({
       type: status,
       centerName: updated.centerName,
       amount: updated.amount,
       purpose: updated.reason,
+      approvedBy,
     });
     await tx.save();
 
     res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// --- Auditor: Submit remark ---
+app.post("/api/requests/:id/remark", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { remark } = req.body;
+
+    const request = await Request.findById(id);
+    if (!request) return res.status(404).json({ error: "Request not found" });
+
+    request.remarks.push({ remark });
+    await request.save();
+
+    res.json({ message: "Remark added successfully", request });
   } catch (error) {
     res.status(500).json({ error: "Server error" });
   }
@@ -190,7 +263,6 @@ app.use("/api/funds", fundsRoutes);
 // --- Transactions ---
 const transactionRoutes = require("./transactions");
 app.use("/api/transactions", transactionRoutes);
-
 
 // --- Fund Timeline ---
 app.get("/api/fundTimeline", async (req, res) => {
@@ -244,13 +316,12 @@ app.get("/api/fundTimeline", async (req, res) => {
 // --- Proof of Spend Upload ---
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, "uploads/"); // save in uploads/ folder
+    cb(null, "uploads/");
   },
   filename: function (req, file, cb) {
-    cb(null, Date.now() + path.extname(file.originalname)); // unique filename
+    cb(null, Date.now() + path.extname(file.originalname));
   },
 });
-
 const upload = multer({ storage: storage });
 
 app.post("/api/proofUpload", upload.single("file"), (req, res) => {
@@ -263,7 +334,6 @@ app.post("/api/proofUpload", upload.single("file"), (req, res) => {
   });
 });
 
-// Make uploads folder accessible
 app.use("/uploads", express.static("uploads"));
 
 // ================== Start Server ==================

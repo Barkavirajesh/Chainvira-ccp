@@ -31,7 +31,7 @@ const Transaction =
   mongoose.models.Transaction ||
   mongoose.model("Transaction", transactionSchema);
 
-// ================== Routes ==================
+// ================== Admin Routes ==================
 
 // Add new fund (POST /api/fundPool)
 router.post("/", async (req, res) => {
@@ -44,10 +44,9 @@ router.post("/", async (req, res) => {
         .json({ error: "Source, amount, and purpose are required" });
     }
 
-    // Generate mock tx hash
     const txHash = "0x" + Math.random().toString(16).slice(2, 10);
 
-    // Save to Fund collection
+    // ✅ Save in Fund collection
     const newFund = new Fund({
       source,
       amount,
@@ -57,7 +56,7 @@ router.post("/", async (req, res) => {
     });
     await newFund.save();
 
-    // ✅ Also log into Transaction collection
+    // ✅ Save in Transactions collection
     const newTransaction = new Transaction({
       type: "Add Fund",
       source,
@@ -86,25 +85,37 @@ router.get("/", async (req, res) => {
   }
 });
 
-// Get fund summary (total pool, total allocated, available balance)
+// ================== Auditor Routes ==================
+
+// Get all transactions (GET /api/fundPool/transactions)
+router.get("/transactions", async (req, res) => {
+  try {
+    const transactions = await Transaction.find().sort({ createdAt: -1 });
+    res.json(transactions);
+  } catch (error) {
+    console.error("❌ Error fetching transactions:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Get fund summary (GET /api/fundPool/summary)
 router.get("/summary", async (req, res) => {
   try {
     // Aggregate total pool
     const poolFunds = await Fund.aggregate([
-      { $group: { _id: null, total: { $sum: "$amount" } } }
+      { $group: { _id: null, total: { $sum: "$amount" } } },
     ]);
 
     // ✅ Safe ApprovedFund model reference
     const ApprovedFund =
-      mongoose.models.ApprovedFund ||
-      mongoose.model("ApprovedFund");
+      mongoose.models.ApprovedFund || mongoose.model("ApprovedFund");
 
     const allocatedFunds = await ApprovedFund.aggregate([
-      { $group: { _id: null, total: { $sum: "$amount" } } }
+      { $group: { _id: null, total: { $sum: "$amount" } } },
     ]);
 
-    const totalPool = poolFunds.length > 0 ? poolFunds[0].total : 0;
-    const totalAllocated = allocatedFunds.length > 0 ? allocatedFunds[0].total : 0;
+    const totalPool = poolFunds[0]?.total || 0;
+    const totalAllocated = allocatedFunds[0]?.total || 0;
     const availableBalance = totalPool - totalAllocated;
 
     res.json({ totalPool, totalAllocated, availableBalance });
