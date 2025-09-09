@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
+const fs = require("fs");
 
 const app = express();
 const PORT = 5000;
@@ -11,6 +12,11 @@ const PORT = 5000;
 // ================== Middleware ==================
 app.use(cors());
 app.use(express.json());
+app.use("/uploads", express.static(path.join(__dirname, "uploads"))); // Serve uploaded files
+
+// Ensure uploads folder exists
+const uploadDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
 
 // ================== MongoDB Connection ==================
 mongoose.connect("mongodb://127.0.0.1:27017/chainvora", {
@@ -18,23 +24,20 @@ mongoose.connect("mongodb://127.0.0.1:27017/chainvora", {
   useUnifiedTopology: true,
 });
 
-mongoose.connection.on("connected", () => {
-  console.log("✅ MongoDB connected");
-});
+mongoose.connection.on("connected", () => console.log("✅ MongoDB connected"));
+mongoose.connection.on("error", (err) =>
+  console.error("❌ MongoDB connection error:", err)
+);
 
-mongoose.connection.on("error", (err) => {
-  console.error("❌ MongoDB connection error:", err);
-});
-
-// ================== Schemas + Models ==================
+// ================== Schemas ==================
 
 // Request Schema
 const requestSchema = new mongoose.Schema({
   centerName: { type: String, required: true },
   amount: { type: Number, required: true },
   reason: { type: String, required: true },
-  status: { type: String, default: "Pending" }, // Pending / Approved / Rejected
-  proof: { type: String }, // uploaded proof (filePath)
+  status: { type: String, default: "Pending" },
+  proofUrl: { type: String }, // Uploaded proof
   remarks: [{ remark: String, createdAt: { type: Date, default: Date.now } }],
   approvedBy: { type: String },
   createdAt: { type: Date, default: Date.now },
@@ -59,28 +62,15 @@ const approvedFundSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
 });
 const ApprovedFund =
-  mongoose.models.ApprovedFund ||
-  mongoose.model("ApprovedFund", approvedFundSchema);
-
-// Fund Schema
-const fundSchema = new mongoose.Schema({
-  source: { type: String, required: true },
-  amount: { type: Number, required: true },
-  purpose: { type: String, required: true },
-  notes: { type: String },
-  txHash: { type: String },
-  createdAt: { type: Date, default: Date.now },
-});
-const Fund = mongoose.models.Fund || mongoose.model("Fund", fundSchema);
+  mongoose.models.ApprovedFund || mongoose.model("ApprovedFund", approvedFundSchema);
 
 // Transaction Schema
 const transactionSchema = new mongoose.Schema({
-  type: { type: String, required: true }, // "Add Fund", "Allocate Fund", "Request", "Approval"
+  type: { type: String, required: true },
   centerName: { type: String },
   source: { type: String },
   amount: { type: Number, required: true },
   purpose: { type: String },
-  notes: { type: String },
   approvedBy: { type: String },
   txHash: { type: String },
   createdAt: { type: Date, default: Date.now },
@@ -88,183 +78,44 @@ const transactionSchema = new mongoose.Schema({
 const Transaction =
   mongoose.models.Transaction || mongoose.model("Transaction", transactionSchema);
 
-// ================== API Routes ==================
-// --- Public APIs ---
+// ================== Multer Setup ==================
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, "uploads/");
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + path.extname(file.originalname));
+  },
+});
+const upload = multer({ storage });
 
-// 1. Approved Funds (read-only for public)
+// ================== API Routes ==================
+
+// --- Public APIs ---
 app.get("/api/public/approved", async (req, res) => {
   try {
     const funds = await ApprovedFund.find().sort({ createdAt: -1 });
     res.json(funds);
-  } catch (error) {
-    console.error("❌ Error fetching approved funds:", error);
+  } catch (err) {
     res.status(500).json({ error: "Server error" });
   }
 });
 
-// 2. Status Tracking (from Requests + Remarks)
 app.get("/api/status", async (req, res) => {
   try {
     const requests = await Request.find().sort({ createdAt: -1 });
     const statusUpdates = requests.map((r) => ({
       centerName: r.centerName,
-      update: r.status,
+      status: r.status,
       date: r.createdAt,
       remarks: r.remarks || [],
     }));
     res.json(statusUpdates);
-  } catch (error) {
-    console.error("❌ Error fetching status:", error);
+  } catch (err) {
     res.status(500).json({ error: "Server error" });
   }
 });
 
-// 3. Milestones (from Transactions)
-app.get("/api/milestones", async (req, res) => {
-  try {
-    const milestones = await Transaction.find({
-      type: { $in: ["Add Fund", "Allocate Fund", "Approved"] },
-    }).sort({ createdAt: -1 });
-
-    const formatted = milestones.map((m) => ({
-      centerName: m.centerName || m.source,
-      milestone: `${m.type} — ${m.purpose || "N/A"}`,
-      completed: true,
-      date: m.createdAt,
-    }));
-
-    res.json(formatted);
-  } catch (error) {
-    console.error("❌ Error fetching milestones:", error);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// --- Requests ---
-app.get("/api/requests", async (req, res) => {
-  try {
-    const requests = await Request.find();
-    res.json(requests);
-  } catch (error) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-app.post("/api/requests", async (req, res) => {
-  try {
-    const { centerName, amount, reason, status } = req.body;
-    const newRequest = new Request({ centerName, amount, reason, status });
-    await newRequest.save();
-
-    // Log as transaction
-    const tx = new Transaction({
-      type: "Request",
-      centerName,
-      amount,
-      purpose: reason,
-    });
-    await tx.save();
-
-    res.json(newRequest);
-  } catch (error) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// Approve / Reject request
-app.put("/api/requests/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status, approvedBy } = req.body;
-
-    const updated = await Request.findByIdAndUpdate(
-      id,
-      { status, approvedBy },
-      { new: true }
-    );
-
-    if (!updated) return res.status(404).json({ error: "Request not found" });
-
-    const tx = new Transaction({
-      type: status,
-      centerName: updated.centerName,
-      amount: updated.amount,
-      purpose: updated.reason,
-      approvedBy,
-    });
-    await tx.save();
-
-    res.json(updated);
-  } catch (error) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// --- Auditor: Submit remark ---
-app.post("/api/requests/:id/remark", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { remark } = req.body;
-
-    const request = await Request.findById(id);
-    if (!request) return res.status(404).json({ error: "Request not found" });
-
-    request.remarks.push({ remark });
-    await request.save();
-
-    res.json({ message: "Remark added successfully", request });
-  } catch (error) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// --- Users ---
-app.post("/api/users/connect", async (req, res) => {
-  try {
-    const { walletAddress, role } = req.body;
-    if (!walletAddress || !role) {
-      return res
-        .status(400)
-        .json({ error: "walletAddress and role are required" });
-    }
-
-    let user = await User.findOne({ walletAddress });
-    if (user) {
-      user.role = role;
-      await user.save();
-    } else {
-      user = new User({ walletAddress, role });
-      await user.save();
-    }
-
-    res.json(user);
-  } catch (error) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-app.get("/api/users", async (req, res) => {
-  try {
-    const users = await User.find();
-    res.json(users);
-  } catch (error) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// --- Fund Pool ---
-const fundPoolRoutes = require("./fundpool");
-app.use("/api/fundPool", fundPoolRoutes);
-
-// --- Funds ---
-const fundsRoutes = require("./funds");
-app.use("/api/funds", fundsRoutes);
-
-// --- Transactions ---
-const transactionRoutes = require("./transactions");
-app.use("/api/transactions", transactionRoutes);
-
-// --- Fund Timeline ---
 app.get("/api/fundTimeline", async (req, res) => {
   try {
     const requests = await Request.find().select(
@@ -272,9 +123,6 @@ app.get("/api/fundTimeline", async (req, res) => {
     );
     const approvals = await ApprovedFund.find().select(
       "centerName amount purpose approvedBy txHash createdAt"
-    );
-    const fundPool = await Fund.find().select(
-      "source amount purpose createdAt"
     );
 
     const timeline = [
@@ -293,48 +141,134 @@ app.get("/api/fundTimeline", async (req, res) => {
         description: a.purpose,
         status: "Approved by " + (a.approvedBy || "Admin"),
         date: a.createdAt,
-      })),
-      ...fundPool.map((f) => ({
-        type: "Fund Added",
-        centerName: f.source,
-        amount: f.amount,
-        description: f.purpose,
-        status: "Fund Pool",
-        date: f.createdAt,
+        txHash: a.txHash,
       })),
     ];
 
     timeline.sort((a, b) => new Date(b.date) - new Date(a.date));
-
     res.json(timeline);
-  } catch (error) {
-    console.error("❌ Error fetching timeline:", error);
+  } catch (err) {
     res.status(500).json({ error: "Server error" });
   }
 });
 
-// --- Proof of Spend Upload ---
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "uploads/");
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + path.extname(file.originalname));
-  },
-});
-const upload = multer({ storage: storage });
-
-app.post("/api/proofUpload", upload.single("file"), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: "No file uploaded" });
+// --- Requests ---
+app.get("/api/requests", async (req, res) => {
+  try {
+    const requests = await Request.find();
+    res.json(requests);
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
   }
-  res.json({
-    message: "File uploaded successfully",
-    filePath: `/uploads/${req.file.filename}`,
-  });
 });
 
-app.use("/uploads", express.static("uploads"));
+app.post("/api/requests", async (req, res) => {
+  try {
+    const { centerName, amount, reason } = req.body;
+    const newRequest = new Request({ centerName, amount, reason });
+    await newRequest.save();
+
+    // Log transaction
+    await new Transaction({
+      type: "Request",
+      centerName,
+      amount,
+      purpose: reason,
+    }).save();
+
+    res.json(newRequest);
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Approve / Reject
+app.put("/api/requests/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, approvedBy } = req.body;
+
+    const updated = await Request.findByIdAndUpdate(
+      id,
+      { status, approvedBy },
+      { new: true }
+    );
+    if (!updated) return res.status(404).json({ error: "Request not found" });
+
+    // Log transaction
+    await new Transaction({
+      type: status,
+      centerName: updated.centerName,
+      amount: updated.amount,
+      purpose: updated.reason,
+      approvedBy,
+    }).save();
+
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// --- Remarks ---
+app.post("/api/requests/:id/remark", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { remark } = req.body;
+
+    const request = await Request.findById(id);
+    if (!request) return res.status(404).json({ error: "Request not found" });
+
+    request.remarks.push({ remark });
+    await request.save();
+
+    res.json({ message: "Remark added successfully", request });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// --- Proof Upload ---
+app.put("/api/requests/:id/proof", upload.single("proof"), async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+    const proofUrl = `/uploads/${req.file.filename}`;
+    const updated = await Request.findByIdAndUpdate(
+      id,
+      { proofUrl },
+      { new: true }
+    );
+
+    if (!updated) return res.status(404).json({ error: "Request not found" });
+
+    res.json({ message: "Proof uploaded successfully", proofUrl });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// --- Users ---
+app.post("/api/users/connect", async (req, res) => {
+  try {
+    const { walletAddress, role } = req.body;
+    if (!walletAddress || !role)
+      return res.status(400).json({ error: "walletAddress and role required" });
+
+    let user = await User.findOne({ walletAddress });
+    if (user) {
+      user.role = role;
+      await user.save();
+    } else {
+      user = new User({ walletAddress, role });
+      await user.save();
+    }
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
 // ================== Start Server ==================
 app.listen(PORT, () => {

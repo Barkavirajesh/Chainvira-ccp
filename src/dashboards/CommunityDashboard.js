@@ -16,34 +16,42 @@ export default function CommunityDashboard() {
   const [requests, setRequests] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [uploadingProof, setUploadingProof] = useState({}); // Track proof upload per request
 
   // Fetch summary
   useEffect(() => {
-    axios.get("http://localhost:5000/api/fundPool/summary").then((res) => {
-      setSummary(res.data);
-    });
+    axios.get("http://localhost:5000/api/fundPool/summary")
+      .then((res) => setSummary(res.data))
+      .catch((err) => console.error(err));
   }, []);
 
   // Fetch requests
   useEffect(() => {
-    axios.get("http://localhost:5000/api/requests").then((res) => {
-      setRequests(res.data);
-    });
+    fetchRequests();
   }, []);
+
+  const fetchRequests = async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/api/requests");
+      setRequests(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   // Fetch transactions
   useEffect(() => {
-    axios.get("http://localhost:5000/api/transactions").then((res) => {
-      setTransactions(res.data);
-    });
+    axios.get("http://localhost:5000/api/transactions")
+      .then((res) => setTransactions(res.data))
+      .catch((err) => console.error(err));
   }, []);
 
-  // Handle form change
+  // Handle form input change
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  // Submit fund request
+  // Submit new fund request
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -53,8 +61,39 @@ export default function CommunityDashboard() {
       setForm({ centerName: "", amount: "", reason: "" });
     } catch (err) {
       console.error("Error submitting request:", err);
+      alert("Failed to submit request.");
     }
     setLoading(false);
+  };
+
+  // Upload proof file
+  const handleProofUpload = async (requestId, file) => {
+    if (!file) return;
+    setUploadingProof({ ...uploadingProof, [requestId]: true });
+
+    try {
+      const formData = new FormData();
+      formData.append("proof", file);
+
+      const res = await axios.put(
+        `http://localhost:5000/api/requests/${requestId}/proof`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+
+      // Update request with proof URL
+      setRequests((prev) =>
+        prev.map((req) =>
+          req._id === requestId ? { ...req, proofUrl: res.data.proofUrl } : req
+        )
+      );
+      alert("Proof uploaded successfully!");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to upload proof.");
+    }
+
+    setUploadingProof({ ...uploadingProof, [requestId]: false });
   };
 
   return (
@@ -73,7 +112,7 @@ export default function CommunityDashboard() {
       <main className="main-content">
         <h1>Community Dashboard</h1>
 
-        {/* Summary */}
+        {/* Fund Summary */}
         <section id="summary" className="summary">
           <div className="card">
             <h2>Total Pool</h2>
@@ -89,7 +128,7 @@ export default function CommunityDashboard() {
           </div>
         </section>
 
-        {/* Fund Request */}
+        {/* Fund Request Form */}
         <section id="requests">
           <h2>Raise Fund Request</h2>
           <form onSubmit={handleSubmit}>
@@ -122,6 +161,7 @@ export default function CommunityDashboard() {
             </button>
           </form>
 
+          {/* Requests Table */}
           <h3>My Requests</h3>
           <table>
             <thead>
@@ -130,6 +170,8 @@ export default function CommunityDashboard() {
                 <th>Amount</th>
                 <th>Reason</th>
                 <th>Status</th>
+                <th>Proof</th>
+                <th>Remarks</th>
                 <th>Date</th>
               </tr>
             </thead>
@@ -140,6 +182,39 @@ export default function CommunityDashboard() {
                   <td>₹{req.amount}</td>
                   <td>{req.reason}</td>
                   <td>{req.status}</td>
+                  <td>
+                    {/* Show upload only if Reviewed and no proof yet */}
+                    {req.status === "Reviewed" && !req.proofUrl ? (
+                      <input
+                        type="file"
+                        accept="image/*,application/pdf"
+                        onChange={(e) =>
+                          handleProofUpload(req._id, e.target.files[0])
+                        }
+                        disabled={uploadingProof[req._id]}
+                      />
+                    ) : req.proofUrl ? (
+                      <a href={req.proofUrl} target="_blank" rel="noreferrer">
+                        View Proof
+                      </a>
+                    ) : (
+                      "N/A"
+                    )}
+                  </td>
+                  <td>
+                    {req.remarks && req.remarks.length > 0 ? (
+                      <ul style={{ paddingLeft: "15px" }}>
+                        {req.remarks.map((r, idx) => (
+                          <li key={idx}>
+                            {r.remark}{" "}
+                            <small>({new Date(r.createdAt).toLocaleString()})</small>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      "No remarks yet"
+                    )}
+                  </td>
                   <td>{new Date(req.createdAt).toLocaleString()}</td>
                 </tr>
               ))}
@@ -147,7 +222,7 @@ export default function CommunityDashboard() {
           </table>
         </section>
 
-        {/* Transactions */}
+        {/* Transactions Section */}
         <section id="transactions">
           <h2>Transactions</h2>
           {transactions.length === 0 ? (
@@ -171,7 +246,7 @@ export default function CommunityDashboard() {
                     <td>{tx.centerName || tx.source}</td>
                     <td>₹{tx.amount}</td>
                     <td>{tx.purpose}</td>
-                    <td>{tx.txHash}</td>
+                    <td>{tx.txHash || "N/A"}</td>
                     <td>{new Date(tx.createdAt).toLocaleString()}</td>
                   </tr>
                 ))}

@@ -14,18 +14,26 @@
   padding: 20px;
   display: flex;
   flex-direction: column;
+  justify-content: space-between; /* space top and bottom */
+}
+
+.community-dashboard .sidebar .top-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .community-dashboard .sidebar h2 {
   font-size: 20px;
   font-weight: bold;
   margin-bottom: 30px;
-  text-align: center;
+  text-align: left;
+  color: #38bdf8; /* highlight title */
 }
 
 .community-dashboard .sidebar nav a {
   display: block;
-  margin: 15px 0;
+  margin: 12px 0;
   text-decoration: none;
   color: #cbd5e1;
   font-size: 16px;
@@ -34,6 +42,25 @@
 
 .community-dashboard .sidebar nav a:hover {
   color: #38bdf8;
+}
+
+/* Logout button fixed bottom */
+.community-dashboard .sidebar .logout-btn {
+  margin-top: auto;
+  padding: 10px;
+  width: 100%;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 15px;
+  text-align: center;
+  transition: 0.3s;
+}
+
+.community-dashboard .sidebar .logout-btn:hover {
+  background: #b91c1c;
 }
 
 /* Main Content */

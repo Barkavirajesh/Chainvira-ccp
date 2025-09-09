@@ -1,233 +1,186 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import "bootstrap/dist/css/bootstrap.min.css";
+import "./AuditorDashboard.css";
 
-function AuditorDashboard({ onLogout }) {
-  const [activeTab, setActiveTab] = useState("transactions");
-  const [overview, setOverview] = useState({
-    requests: [],
-    transactions: [],
-  });
-  const [remarks, setRemarks] = useState("");
-  const [selectedRequest, setSelectedRequest] = useState("");
-  const [verifying, setVerifying] = useState({});
-  const navigate = useNavigate();
+export default function AuditorDashboard() {
+  const [requests, setRequests] = useState([]);
+  const [activeSection, setActiveSection] = useState("review");
+  const [remarkBox, setRemarkBox] = useState(null); // Track which request is being remarked
+  const [remarks, setRemarks] = useState({}); // Store current input remarks
 
-  const API_BASE = "http://localhost:5000"; // backend base URL
-
-  // ---------------- Fetch Auditor Overview ----------------
-  const fetchOverview = async () => {
-    try {
-      const res = await axios.get(`${API_BASE}/api/auditor/overview`);
-      setOverview(res.data);
-    } catch (err) {
-      console.error("Error fetching auditor overview:", err);
-    }
-  };
-
+  // Fetch all requests
   useEffect(() => {
-    fetchOverview();
+    fetchRequests();
   }, []);
 
-  // ---------------- Logout ----------------
-  const handleLogout = () => {
-    if (onLogout) onLogout();
-    navigate("/");
+  const fetchRequests = async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/api/requests");
+      setRequests(res.data);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  // ---------------- Verify Proof ----------------
-  const handleVerifyProof = async (requestId) => {
-    setVerifying({ ...verifying, [requestId]: true });
+  // Handle review (approve)
+  const handleReview = async (id) => {
     try {
-      await axios.put(`${API_BASE}/api/requests/${requestId}`, {
-        status: "Approved",
-        approvedBy: "Auditor",
+      const res = await axios.put(`http://localhost:5000/api/requests/${id}`, {
+        status: "Reviewed",
       });
-      alert("✅ Proof verified successfully!");
-      fetchOverview(); // refresh after update
+      setRequests((prev) =>
+        prev.map((req) => (req._id === id ? { ...req, status: res.data.status } : req))
+      );
     } catch (err) {
-      console.error("Error verifying proof:", err);
-      alert("❌ Failed to verify proof.");
+      console.error(err);
     }
-    setVerifying({ ...verifying, [requestId]: false });
   };
 
-  // ---------------- Submit Remark ----------------
-  const handleRemarkSubmit = async () => {
-    if (!selectedRequest || !remarks.trim()) {
-      alert("⚠ Please select a request and write a remark.");
-      return;
-    }
+  // Handle remark submission
+  const handleRemarkSubmit = async (id) => {
+    if (!remarks[id]) return alert("Please enter a remark before submitting.");
+
     try {
-      await axios.post(`${API_BASE}/api/requests/${selectedRequest}/remark`, {
-        remark: remarks,
-      });
-      alert("✅ Remark submitted successfully!");
-      setRemarks("");
-      setSelectedRequest("");
-      fetchOverview();
+      const res = await axios.post(
+        `http://localhost:5000/api/requests/${id}/remark`,
+        { remark: remarks[id] }
+      );
+
+      // Update the request in state to include new remark
+      setRequests((prev) =>
+        prev.map((req) =>
+          req._id === id ? { ...req, remarks: res.data.request.remarks } : req
+        )
+      );
+
+      setRemarks({ ...remarks, [id]: "" }); // Clear input
+      setRemarkBox(null); // Close remark box
+      alert("Remark submitted successfully!");
     } catch (err) {
-      console.error("Error submitting remark:", err);
-      alert("❌ Failed to submit remark.");
+      console.error(err);
+      alert("Failed to submit remark.");
     }
+  };
+
+  // Handle view proof
+  const handleViewProof = (url) => {
+    if (url) window.open(url, "_blank");
+    else alert("No proof uploaded yet.");
   };
 
   return (
-    <div className="d-flex vh-100">
-      {/* ---------------- Sidebar ---------------- */}
-      <div className="bg-dark text-white p-3" style={{ width: "250px" }}>
-        <h4 className="mb-4">Auditor Panel</h4>
+    <div className="auditor-dashboard">
+      {/* Sidebar */}
+      <div className="sidebar">
+        <h2>Auditor Panel</h2>
         <button
-          className={`btn w-100 mb-2 ${
-            activeTab === "transactions" ? "btn-primary" : "btn-outline-light"
-          }`}
-          onClick={() => setActiveTab("transactions")}
+          className={`nav-btn ${activeSection === "review" ? "active" : ""}`}
+          onClick={() => setActiveSection("review")}
         >
-          View Approved Transactions
+          Review Requests
         </button>
-        <button
-          className={`btn w-100 mb-2 ${
-            activeTab === "proofs" ? "btn-primary" : "btn-outline-light"
-          }`}
-          onClick={() => setActiveTab("proofs")}
-        >
-          Verify Proofs
-        </button>
-        <button
-          className={`btn w-100 mb-2 ${
-            activeTab === "remarks" ? "btn-primary" : "btn-outline-light"
-          }`}
-          onClick={() => setActiveTab("remarks")}
-        >
-          Add Remarks
-        </button>
-        <button className="btn btn-danger w-100 mt-3" onClick={handleLogout}>
-          Logout
-        </button>
+        <button className="logout-btn">Logout</button>
       </div>
 
-      {/* ---------------- Main Content ---------------- */}
-      <div className="flex-grow-1 p-4 bg-light overflow-auto">
-        {/* ---------------- Transactions Tab ---------------- */}
-        {activeTab === "transactions" && (
+      {/* Main Content */}
+      <div className="main-content">
+        {activeSection === "review" && (
           <div>
-            <h2 className="text-primary mb-3">Approved Transactions</h2>
-            {overview.transactions.length === 0 ? (
-              <p>No approved transactions available.</p>
+            <h2 className="section-title">Review Community Center Requests</h2>
+            {requests.length === 0 ? (
+              <p>No requests found.</p>
             ) : (
-              <table className="table table-bordered table-striped bg-white">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Center / Source</th>
-                    <th>Amount</th>
-                    <th>Purpose</th>
-                    <th>Approved By</th>
-                    <th>TxHash</th>
-                    <th>Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {overview.transactions.map((txn, index) => (
-                    <tr key={index}>
-                      <td>{txn._id}</td>
-                      <td>{txn.centerName || txn.source}</td>
-                      <td>₹{txn.amount}</td>
-                      <td>{txn.purpose}</td>
-                      <td>{txn.approvedBy || "Admin"}</td>
-                      <td>{txn.txHash || "-"}</td>
-                      <td>{new Date(txn.createdAt).toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        )}
+              requests.map((req) => (
+                <div
+                  key={req._id}
+                  style={{
+                    background: "white",
+                    padding: "15px",
+                    marginBottom: "15px",
+                    borderRadius: "6px",
+                    boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
+                  }}
+                >
+                  <p>
+                    <strong>Community:</strong> {req.centerName}
+                  </p>
+                  <p>
+                    <strong>Amount:</strong> ₹{req.amount}
+                  </p>
+                  <p>
+                    <strong>Reason:</strong> {req.reason}
+                  </p>
+                  <p>
+                    <strong>Status:</strong> {req.status}
+                  </p>
 
-        {/* ---------------- Proofs Tab ---------------- */}
-        {activeTab === "proofs" && (
-          <div>
-            <h2 className="text-primary mb-3">Completion Proofs</h2>
-            {overview.requests.filter((r) => r.proof).length === 0 ? (
-              <p>No proofs uploaded yet.</p>
-            ) : (
-              overview.requests
-                .filter((r) => r.proof)
-                .map((req) => (
-                  <div className="card mb-3" key={req._id}>
-                    <div className="card-body d-flex justify-content-between align-items-center">
-                      <div>
-                        <strong>{req.centerName}</strong> - ₹{req.amount} -{" "}
-                        {req.reason}
-                        <br />
-                        Proof:{" "}
-                        <a
-                          href={`${API_BASE}${req.proof}`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          📎 View
-                        </a>
-                        <br />
-                        Status:{" "}
-                        {req.status === "Approved"
-                          ? "✅ Approved"
-                          : "❌ Not Verified"}
-                      </div>
+                  {/* Buttons */}
+                  <button
+                    className="submit-btn"
+                    onClick={() => handleReview(req._id)}
+                  >
+                    Mark as Reviewed
+                  </button>
+
+                  <button
+                    className="submit-btn"
+                    style={{ marginLeft: "10px", background: "#6c757d" }}
+                    onClick={() =>
+                      setRemarkBox(remarkBox === req._id ? null : req._id)
+                    }
+                  >
+                    Add Remark
+                  </button>
+
+                  <button
+                    className="submit-btn"
+                    style={{ marginLeft: "10px", background: "#007bff" }}
+                    onClick={() => handleViewProof(req.proofUrl)}
+                  >
+                    View Proof
+                  </button>
+
+                  {/* Display existing remarks */}
+                  {req.remarks && req.remarks.length > 0 && (
+                    <div style={{ marginTop: "10px" }}>
+                      <strong>Remarks:</strong>
+                      <ul style={{ paddingLeft: "20px" }}>
+                        {req.remarks.map((r, index) => (
+                          <li key={index}>
+                            {r.remark}{" "}
+                            <small>({new Date(r.createdAt).toLocaleString()})</small>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Remark Box */}
+                  {remarkBox === req._id && (
+                    <div style={{ marginTop: "10px" }}>
+                      <textarea
+                        className="remarks-box"
+                        placeholder="Enter your remarks..."
+                        value={remarks[req._id] || ""}
+                        onChange={(e) =>
+                          setRemarks({ ...remarks, [req._id]: e.target.value })
+                        }
+                      />
                       <button
-                        className="btn btn-success btn-sm"
-                        onClick={() => handleVerifyProof(req._id)}
-                        disabled={req.status === "Approved" || verifying[req._id]}
+                        className="submit-btn"
+                        style={{ marginTop: "8px" }}
+                        onClick={() => handleRemarkSubmit(req._id)}
                       >
-                        {req.status === "Approved"
-                          ? "✅ Approved"
-                          : verifying[req._id]
-                          ? "Verifying..."
-                          : "Verify"}
+                        Submit Remark
                       </button>
                     </div>
-                  </div>
-                ))
+                  )}
+                </div>
+              ))
             )}
-          </div>
-        )}
-
-        {/* ---------------- Remarks Tab ---------------- */}
-        {activeTab === "remarks" && (
-          <div>
-            <h2 className="text-primary mb-3">Add Remarks</h2>
-            <label>Select Community Center Request</label>
-            <select
-              className="form-control mb-3"
-              value={selectedRequest}
-              onChange={(e) => setSelectedRequest(e.target.value)}
-            >
-              <option value="">-- Select a Request --</option>
-              {overview.requests.map((req) => (
-                <option key={req._id} value={req._id}>
-                  {req.centerName} - ₹{req.amount} - {req.reason}
-                </option>
-              ))}
-            </select>
-
-            <textarea
-              className="form-control mb-3"
-              rows="5"
-              value={remarks}
-              onChange={(e) => setRemarks(e.target.value)}
-              placeholder="Write your comments here..."
-            ></textarea>
-
-            <button className="btn btn-primary" onClick={handleRemarkSubmit}>
-              Submit Remark
-            </button>
           </div>
         )}
       </div>
     </div>
   );
 }
-
-export default AuditorDashboard;

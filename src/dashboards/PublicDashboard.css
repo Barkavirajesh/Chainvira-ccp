@@ -1,112 +1,198 @@
-/* Public Dashboard Layout */
+/* PublicDashboard.css */
+
+/* General Layout */
 .public-dashboard {
-  display: flex;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  padding: 20px;
+  background-color: #f8f9fa;
   min-height: 100vh;
-  font-family: Arial, sans-serif;
-  background: #f9fafb;
 }
 
-/* Sidebar */
-.sidebar {
-  width: 220px;
-  background: #8b0000;
-  color: white;
-  padding: 20px;
+header h1 {
+  text-align: center;
+  margin-bottom: 30px;
+  color: #333;
+}
+
+/* Summary Cards */
+.summary-cards {
   display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  gap: 20px;
+  justify-content: center;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
 }
 
-.sidebar .logo {
-  font-size: 20px;
-  font-weight: bold;
-  margin-bottom: 20px;
-}
-
-.sidebar nav ul {
-  list-style: none;
-  padding: 0;
-}
-
-.sidebar nav li {
-  margin: 15px 0;
-  cursor: pointer;
-  padding: 8px 10px;
-  border-radius: 6px;
-  transition: background 0.2s;
-}
-
-.sidebar nav li:hover {
-  background: #a52a2a;
-}
-
-.logout-btn {
-  background: black;
-  border: none;
-  padding: 10px;
-  color: white;
-  cursor: pointer;
-  border-radius: 5px;
-  margin-top: 20px;
-}
-
-/* Main Content */
-.main-content {
-  flex: 1;
+.card {
+  flex: 1 1 200px;
   padding: 20px;
+  border-radius: 12px;
+  color: white;
+  box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+  text-align: center;
+  transition: transform 0.2s;
 }
 
-.dashboard-title {
-  font-size: 28px;
+.card:hover {
+  transform: translateY(-5px);
+}
+
+.card h3 {
+  margin-bottom: 10px;
+  font-size: 18px;
+}
+
+.card p {
+  font-size: 24px;
   font-weight: bold;
-  margin-bottom: 20px;
-  color: #312560;
 }
 
-/* Cards */
+/* Card Colors */
+.card.blue {
+  background-color: #3498db;
+}
+
+.card.green {
+  background-color: #2ecc71;
+}
+
+.card.orange {
+  background-color: #f39c12;
+}
+
+/* Filter */
+.filter-center {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.filter-center select {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 16px;
+}
+
+/* Tables */
+.funds-section, .timeline-section {
+  margin-bottom: 30px;
+}
+
+.funds-section table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.funds-section th, .funds-section td {
+  padding: 12px 15px;
+  text-align: left;
+}
+
+.funds-section th {
+  background-color: #3498db;
+  color: white;
+}
+
+.funds-section tr:nth-child(even) {
+  background-color: #f2f2f2;
+}
+
+.funds-section a {
+  color: #2980b9;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.funds-section a:hover {
+  text-decoration: underline;
+}
+
+/* Timeline */
+.timeline-section ul.timeline {
+  list-style: none;
+  padding-left: 0;
+}
+
+.timeline-section ul.timeline li {
+  background-color: white;
+  padding: 15px;
+  margin-bottom: 10px;
+  border-left: 4px solid #3498db;
+  border-radius: 6px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+}
+
+/* Charts */
+.chart-section {
+  background-color: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+  margin-bottom: 30px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .summary-cards {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .card {
+    width: 80%;
+  }
+  .chart-section {
+  margin: 40px auto;
+  max-width: 1000px;
+}
+.chart-section h2 {
+  text-align: center;
+  margin-bottom: 20px;
+}
+.cards-section {
+  display: flex;
+  justify-content: space-around;
+  margin: 20px 0;
+  flex-wrap: wrap;
+}
 .card {
   background: white;
   padding: 20px;
   border-radius: 10px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-  margin-bottom: 20px;
+  text-align: center;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  margin: 10px;
+  min-width: 180px;
 }
 
-.card-title {
-  font-size: 18px;
-  font-weight: bold;
-  margin-bottom: 10px;
+.chart-section, .timeline-section {
+  margin: 40px auto;
+  max-width: 1000px;
 }
 
-/* Tables */
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 10px;
+.timeline {
+  list-style: none;
+  padding: 0;
+}
+.timeline li {
+  margin-bottom: 15px;
+}
+.timeline-card {
+  background: #f9f9f9;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.timeline li.approved .timeline-card {
+  border-left: 5px solid #4caf50;
+}
+.timeline li.request .timeline-card {
+  border-left: 5px solid #f44336;
 }
 
-.table th,
-.table td {
-  border: 1px solid #ddd;
-  padding: 8px;
-  text-align: left;
-}
 
-.table th {
-  background: #f4f4f4;
-}
-
-/* Lists */
-.list {
-  margin-top: 10px;
-  padding-left: 20px;
-}
-
-.list li {
-  margin: 6px 0;
-}
-
-.date {
-  color: gray;
-  font-size: 14px;
 }
